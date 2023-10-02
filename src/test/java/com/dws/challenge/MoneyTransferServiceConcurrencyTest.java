@@ -1,16 +1,14 @@
 package com.dws.challenge;
 
 import com.dws.challenge.domain.Account;
-import com.dws.challenge.repository.AccountsRepositoryInMemory;
-import com.dws.challenge.service.NotificationService;
-import org.junit.jupiter.api.BeforeEach;
+import com.dws.challenge.repository.AccountsRepository;
+import com.dws.challenge.service.MoneyTransferService;
 import org.junit.jupiter.api.RepeatedTest;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.parallel.Execution;
-import org.junit.jupiter.api.parallel.ExecutionMode;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.math.BigDecimal;
 import java.util.concurrent.CountDownLatch;
@@ -19,35 +17,31 @@ import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class AccountsRepositoryInMemoryTest {
+@ExtendWith(SpringExtension.class)
+@SpringBootTest
+public class MoneyTransferServiceConcurrencyTest {
 
-    @InjectMocks
-    private AccountsRepositoryInMemory accountsRepository;
+    @Autowired
+    private MoneyTransferService moneyTransferService;
 
-    @Mock
-    private NotificationService notificationService;
-
-    @BeforeEach
-    void init() {
-        MockitoAnnotations.openMocks(this);
-    }
-
-    // Tests for Other methods
-
-    @RepeatedTest(10)
-    @Execution(ExecutionMode.SAME_THREAD)
-    @Test
+    @RepeatedTest(5)
+    @Timeout(value = 10)
     void shouldTransferMoneyConcurrently() throws InterruptedException {
-        // Create two mock accounts with initial balances
         Account accountFrom = new Account("accountFrom");
-        accountFrom.setBalance(new BigDecimal("2000.00"));
         Account accountTo = new Account("accountTo");
+
+        // Create two mock accounts with initial balances
+        accountFrom.setBalance(new BigDecimal("2000.00"));
         accountTo.setBalance(new BigDecimal("1000.00"));
+
+        AccountsRepository accountsRepository = moneyTransferService.getAccountsRepository();
 
         // Initialize accounts in the repository
         accountsRepository.clearAccounts();
         accountsRepository.createAccount(accountFrom);
         accountsRepository.createAccount(accountTo);
+
+        System.out.println("Initialised");
 
         int numberOfThreads = 1000;
         BigDecimal transferAmount = new BigDecimal(1);
@@ -66,7 +60,7 @@ public class AccountsRepositoryInMemoryTest {
             // Concurrent transfer accountFrom -> accountTo
             executorServiceFromTo.submit(() -> {
                 try {
-                    accountsRepository.transferMoney("accountFrom", "accountTo", transferAmount);
+                    moneyTransferService.transferMoney("accountFrom", "accountTo", transferAmount);
                 } catch (Exception e) {
                     // Handle exceptions if needed
                 } finally {
@@ -77,7 +71,7 @@ public class AccountsRepositoryInMemoryTest {
             // Concurrent transfer accountTo -> accountFrom
             executorServiceToFrom.submit(() -> {
                 try {
-                    accountsRepository.transferMoney("accountTo", "accountFrom", transferAmount);
+                    moneyTransferService.transferMoney("accountTo", "accountFrom", transferAmount);
                 } catch (Exception e) {
                     // Handle exceptions if needed
                 } finally {
@@ -88,7 +82,7 @@ public class AccountsRepositoryInMemoryTest {
             // Concurrent transfer accountFrom -> accountTo again
             executorServiceFromToAgain.submit(() -> {
                 try {
-                    accountsRepository.transferMoney("accountFrom", "accountTo", transferAmount);
+                    moneyTransferService.transferMoney("accountFrom", "accountTo", transferAmount);
                 } catch (Exception e) {
                     // Handle exceptions if needed
                 } finally {

@@ -4,6 +4,7 @@ import com.dws.challenge.domain.Account;
 import com.dws.challenge.exception.InsufficientBalanceException;
 import com.dws.challenge.exception.InvalidTransferAmountException;
 import com.dws.challenge.repository.AccountsRepository;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,7 @@ import java.math.BigDecimal;
 @Service
 public class MoneyTransferService {
 
+    @Getter
     private final AccountsRepository accountsRepository;
     private final NotificationService notificationService;
 
@@ -37,8 +39,15 @@ public class MoneyTransferService {
             throw new InvalidTransferAmountException("Invalid transfer amount");
         }
 
-        // Transfer money
-        accountsRepository.transferMoney(accountFromId, accountToId, amount);
+        Account accountMax = (accountFromId.compareTo(accountToId) > 0) ? accountFrom : accountTo;
+        Account accountMin = (accountFromId.compareTo(accountToId) > 0) ? accountTo   : accountFrom;
+
+        synchronized (accountMax) {
+            synchronized (accountMin) {
+                // Transfer money
+                accountsRepository.transferMoney(accountFromId, accountToId, amount);
+            }
+        }
 
         // Notify both account holders
         String notificationMessage = "Amount " + amount + " transferred from account " + accountFromId;
